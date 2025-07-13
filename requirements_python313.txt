@@ -1,0 +1,37 @@
+# ===========================================
+# API REST SUNAT - Requirements para Python 3.13
+# ===========================================
+
+# Django y REST Framework
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# HTTP requests
+requests==2.31.0
+
+# Variables de entorno
+python-decouple==3.8
+
+# Validación de esquemas XML
+xmlschema==2.5.1
+
+# Utilidades adicionales
+python-dateutil==2.8.2
+
+# Cliente SOAP (opcional)
+zeep==4.2.1
+
+# Procesamiento XML seguro (alternativa a lxml)
+defusedxml>=0.7.1
+
+# Base de datos MySQL
+mysqlclient>=2.2.0
+
+# ===========================================
+# NOTA: lxml se instala automáticamente si hay wheels disponibles
+# Si no se puede instalar, el proyecto usará xml.etree.ElementTree
+# ===========================================
+
+# Procesamiento XML (opcional en Python 3.13)
+# lxml>=5.0.0  # Descomenta si quieres intentar instalarlo 
