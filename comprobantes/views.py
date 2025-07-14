@@ -25,7 +25,7 @@ from .utils import (
 )
 
 if SIGNING_AVAILABLE:
-    from .utils import extraer_clave_certificado_pfx, firmar_xml_ubl
+    from .utils import firmar_xml_ubl
 
 logger = logging.getLogger(__name__)
 
@@ -185,9 +185,16 @@ def convert_to_xml(request):
                 cert_path = os.path.join(settings.BASE_DIR, 'CERTIFICADO.pfx')
                 cert_pass = 'prueba123'
                 if os.path.exists(cert_path):
-                    private_key, cert = extraer_clave_certificado_pfx(cert_path, cert_pass)
-                    xml_firmado = firmar_xml_ubl(xml_content, private_key, cert)
+                    temp_xml_path = 'temp_para_firma.xml'
+                    with open(temp_xml_path, 'w', encoding='utf-8') as f:
+                        f.write(xml_content)
+                    xml_firmado_bytes = firmar_xml_ubl(temp_xml_path, cert_path, cert_pass)
+                    xml_firmado = xml_firmado_bytes.decode('utf-8')
                     print("✅ XML firmado correctamente")
+                    print(f"🔍 Path archivo firmado: {temp_xml_path.replace('.xml', '_con_firma.xml')}")
+                    print(f"🔍 Primeros 500 caracteres del XML firmado:\n{xml_firmado[:500]}")
+                    if '<ds:Signature' not in xml_firmado:
+                        print('⚠️  ADVERTENCIA: El XML firmado no contiene <ds:Signature>')
                 else:
                     print("⚠️  Certificado no encontrado, continuando sin firma")
             else:
