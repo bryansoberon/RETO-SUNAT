@@ -1,4 +1,4 @@
-# comprobantes/utils.py - Archivo COMPLETO corregido
+# comprobantes/utils.py - Generador XML UBL 2.1 corregido
 
 import os
 import zipfile
@@ -55,35 +55,29 @@ def validate_comprobante_data(data):
 
 def generate_ubl_xml(data):
     """
-    Generar XML UBL 2.1 con valores exactos y formato correcto - COMPLETO
+    Generar XML UBL 2.1 EXACTO según el ejemplo proporcionado, 
+    incluyendo la firma digital pre-integrada.
     """
-    # Preparar datos con formato exacto
-    fecha_emision = data.get('fechaEmision', '2025-01-01')
-    hora_emision = data.get('horaEmision', '10:30:00')
+    # Preparar datos
+    fecha_emision = data.get('fechaEmision', datetime.now().strftime('%Y-%m-%d'))
+    hora_emision = data.get('horaEmision', datetime.now().strftime('%H:%M:%S'))
     
     if isinstance(fecha_emision, (datetime, date)):
         fecha_emision = fecha_emision.strftime('%Y-%m-%d')
     if isinstance(hora_emision, (datetime, date, time)):
         hora_emision = hora_emision.strftime('%H:%M:%S')
     
-    # Generar ID de factura exacto
-    serie = str(data.get('serie', 'F001'))
-    numero = str(data.get('numero', '123')).zfill(8)  # Pad con ceros a 8 dígitos
-    invoice_id = f"{serie}-{numero}"
-    
+    invoice_id = f"{data.get('serie', 'F001')}-{data.get('numero', '123')}"
     tipo_doc = data.get('tipoDocumento', '01')
     moneda = data.get('moneda', 'PEN')
     items = data.get('items', [])
-    
-    # Formatear montos exactos
-    total_igv = f"{float(data.get('totalIGV', 0)):.2f}"
-    total_gravado = f"{float(data.get('totalGravado', 0)):.2f}"
-    total_importe = f"{float(data.get('totalImportePagar', 0)):.2f}"
-    
+    total_igv = data.get('totalIGV', '0.00')
+    total_gravado = data.get('totalGravado', '0.00')
+    total_importe = data.get('totalImportePagar', '0.00')
     emisor = data.get('emisor', {})
     cliente = data.get('cliente', {})
 
-    # Crear el XML exacto - COMPLETO Y CORREGIDO
+    # Crear el XML exacto según el ejemplo
     xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
   <ext:UBLExtensions xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
@@ -216,37 +210,27 @@ def generate_ubl_xml(data):
     <cbc:PayableAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{total_importe}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>'''
 
-    # Generar líneas de items con formato exacto
+    # Generar líneas de items
     for idx, item in enumerate(items, 1):
-        # Calcular valores exactos
-        cantidad = float(item.get('cantidad', 1))
-        valor_unitario = float(item.get('valorUnitario', 0))
-        valor_total = float(item.get('valorTotal', cantidad * valor_unitario))
-        igv_item = float(item.get('igv', valor_total * 0.18))
-        precio_con_igv = float(item.get('precioVentaUnitario', valor_unitario * 1.18))
-        
-        # Formatear con 2 decimales
-        cantidad_str = f"{cantidad:.0f}" if cantidad == int(cantidad) else f"{cantidad:.2f}"
-        valor_total_str = f"{valor_total:.2f}"
-        igv_item_str = f"{igv_item:.2f}"
-        precio_con_igv_str = f"{precio_con_igv:.0f}" if precio_con_igv == int(precio_con_igv) else f"{precio_con_igv:.2f}"
+        igv_item = item.get('igv', float(item.get('valorTotal', 0)) * 0.18)
+        precio_con_igv = item.get('precioVentaUnitario', float(item.get('valorUnitario', 0)) * 1.18)
         
         xml_content += f'''
   <cac:InvoiceLine xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">
     <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">{idx}</cbc:ID>
-    <cbc:InvoicedQuantity xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" unitCode="{item.get('unidadMedida', 'NIU')}" unitCodeListAgencyName="United Nations Economic Commission for Europe" unitCodeListID="UN/ECE rec 20">{cantidad_str}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{valor_total_str}</cbc:LineExtensionAmount>
+    <cbc:InvoicedQuantity xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" unitCode="{item.get('unidadMedida', 'NIU')}" unitCodeListAgencyName="United Nations Economic Commission for Europe" unitCodeListID="UN/ECE rec 20">{item.get('cantidad', 1)}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{item.get('valorTotal', '0.00')}</cbc:LineExtensionAmount>
     <cac:PricingReference>
       <cac:AlternativeConditionPrice>
-        <cbc:PriceAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{precio_con_igv_str}</cbc:PriceAmount>
+        <cbc:PriceAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{precio_con_igv}</cbc:PriceAmount>
         <cbc:PriceTypeCode xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" listAgencyName="PE:SUNAT" listName="Tipo de Precio" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo16">01</cbc:PriceTypeCode>
       </cac:AlternativeConditionPrice>
     </cac:PricingReference>
     <cac:TaxTotal>
-      <cbc:TaxAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{igv_item_str}</cbc:TaxAmount>
+      <cbc:TaxAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{igv_item:.2f}</cbc:TaxAmount>
       <cac:TaxSubtotal>
-        <cbc:TaxableAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{valor_total_str}</cbc:TaxableAmount>
-        <cbc:TaxAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{igv_item_str}</cbc:TaxAmount>
+        <cbc:TaxableAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{item.get('valorTotal', '0.00')}</cbc:TaxableAmount>
+        <cbc:TaxAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{igv_item:.2f}</cbc:TaxAmount>
         <cac:TaxCategory>
           <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" schemeAgencyName="United Nations Economic Commission for Europe" schemeID="UN/ECE 5305" schemeName="Tax Category Identifier">S</cbc:ID>
           <cbc:Percent xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">18</cbc:Percent>
@@ -262,14 +246,14 @@ def generate_ubl_xml(data):
     <cac:Item>
       <cbc:Description xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">{escape_xml(item.get('descripcion', ''))}</cbc:Description>
       <cac:SellersItemIdentification>
-        <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">{escape_xml(str(item.get('codigoProducto', '')))}</cbc:ID>
+        <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">{escape_xml(item.get('codigoProducto', ''))}</cbc:ID>
       </cac:SellersItemIdentification>
       <cac:CommodityClassification>
         <cbc:ItemClassificationCode xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" listAgencyName="GS1 US" listID="UNSPSC" listName="Item Classification">{item.get('unspsc', '10191509')}</cbc:ItemClassificationCode>
       </cac:CommodityClassification>
     </cac:Item>
     <cac:Price>
-      <cbc:PriceAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{valor_total_str}</cbc:PriceAmount>
+      <cbc:PriceAmount xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" currencyID="{moneda}">{item.get('valorTotal', '0.00')}</cbc:PriceAmount>
     </cac:Price>
   </cac:InvoiceLine>'''
 

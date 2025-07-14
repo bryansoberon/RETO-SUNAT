@@ -36,7 +36,7 @@ class ComprobanteInputSerializer(serializers.Serializer):
     
     # Datos básicos del comprobante
     serie = serializers.CharField(max_length=4, min_length=4)
-    numero = serializers.CharField(max_length=8, min_length=8)
+    numero = serializers.CharField(max_length=8, min_length=1)  # ← CORREGIDO: min_length=1
     fechaEmision = serializers.DateField(required=False)
     horaEmision = serializers.TimeField(required=False)
     tipoDocumento = serializers.ChoiceField(choices=[('01', 'Factura'), ('03', 'Boleta'), ('07', 'Nota de Crédito'), ('08', 'Nota de Débito')])
@@ -60,6 +60,23 @@ class ComprobanteInputSerializer(serializers.Serializer):
         child=serializers.DictField(),
         min_length=1
     )
+    
+    def validate_numero(self, value):
+        """Validar y formatear número de comprobante"""
+        # Convertir a string y validar que solo contenga dígitos
+        numero_str = str(value).strip()
+        
+        if not numero_str.isdigit():
+            raise serializers.ValidationError("El número debe contener solo dígitos")
+        
+        # Validar rango razonable (máximo 8 dígitos)
+        if len(numero_str) > 8:
+            raise serializers.ValidationError("El número no puede tener más de 8 dígitos")
+        
+        # Rellenar con ceros a la izquierda para llegar a 8 dígitos
+        numero_formateado = numero_str.zfill(8)
+        
+        return numero_formateado
     
     def validate_emisor(self, value):
         """Validar datos del emisor"""
@@ -128,12 +145,6 @@ class ComprobanteInputSerializer(serializers.Serializer):
             raise serializers.ValidationError("La serie debe tener el formato: 1 o 2 letras seguidas de 3 dígitos (ej: F001, B001)")
         return value
 
-    def validate_numero(self, value):
-        """Validar número de comprobante"""
-        if not value.isdigit() or len(value) != 8:
-            raise serializers.ValidationError("El número debe tener 8 dígitos numéricos")
-        return value
-
     def validate_items(self, value):
         """Validar estructura de los items"""
         if not value or len(value) == 0:
@@ -187,7 +198,7 @@ class ComprobanteInputSerializer(serializers.Serializer):
         return value
 
     def validate(self, data):
-        """Validación de datos cruzados"""
+        """Validación de datos cruzados - CORREGIDA según estándares SUNAT"""
         # Validar que los importes tengan máximo dos decimales
         decimal_fields = ['totalGravado', 'totalIGV', 'totalPrecioVenta', 'totalImportePagar']
         for field in decimal_fields:
@@ -212,12 +223,13 @@ class ComprobanteInputSerializer(serializers.Serializer):
         # Obtener valores enviados
         total_gravado_enviado = Decimal(str(data.get('totalGravado', 0)))
         igv_enviado = Decimal(str(data.get('totalIGV', 0)))
+        total_precio_venta_enviado = Decimal(str(data.get('totalPrecioVenta', 0)))  # ← NUEVO
         total_pagar_enviado = Decimal(str(data['totalImportePagar']))
         
         # Validaciones con tolerancia de 0.01
         tolerancia = Decimal('0.01')
         
-        # 1. Validar que totalGravado coincida con suma de items
+        # 1. Validar que totalGravado coincida con suma de items (SIN IGV)
         if abs(total_items - total_gravado_enviado) > tolerancia:
             raise serializers.ValidationError(
                 f"El total gravado ({total_gravado_enviado}) no coincide con la suma de items ({total_items}). "
@@ -231,18 +243,17 @@ class ComprobanteInputSerializer(serializers.Serializer):
                 f"Diferencia: {abs(igv_calculado - igv_enviado)}"
             )
         
-        # 3. Validar que el total a pagar sea correcto
-        if abs(total_con_igv - total_pagar_enviado) > tolerancia:
+        # 3. Validar que totalPrecioVenta = totalGravado + IGV (CON IGV)
+        if abs(total_con_igv - total_precio_venta_enviado) > tolerancia:
             raise serializers.ValidationError(
-                f"El total a pagar ({total_pagar_enviado}) no coincide con el calculado ({total_con_igv}). "
-                f"Cálculo: Items {total_items} + IGV {igv_calculado} = {total_con_igv}"
+                f"El total precio venta ({total_precio_venta_enviado}) no coincide con el calculado ({total_con_igv}). "
+                f"Debe ser: Items {total_items} + IGV {igv_calculado} = {total_con_igv}"
             )
         
-        # 4. Validar que totalPrecioVenta coincida con totalGravado (normalmente son iguales)
-        total_precio_venta = Decimal(str(data.get('totalPrecioVenta', 0)))
-        if abs(total_items - total_precio_venta) > tolerancia:
+        # 4. Validar que el total a pagar coincida con total precio venta
+        if abs(total_precio_venta_enviado - total_pagar_enviado) > tolerancia:
             raise serializers.ValidationError(
-                f"El total precio venta ({total_precio_venta}) debe coincidir con el total gravado ({total_items})"
+                f"El total a pagar ({total_pagar_enviado}) debe coincidir con el total precio venta ({total_precio_venta_enviado})"
             )
         
         # Validar campos obligatorios según tipo de comprobante
