@@ -34,7 +34,6 @@ def frontend_view(request):
     return render(request, 'index.html')
 
 @api_view(['POST'])
-@parser_classes([JSONParser])
 def validate_comprobante(request):
     """Endpoint para validar datos JSON de comprobante electrónico"""
     try:
@@ -315,3 +314,35 @@ def health_check(request):
             'status': 'unhealthy',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'POST'])
+def send_to_sunat(request, comprobante_id):
+    return Response({"ok": True, "msg": "send_to_sunat placeholder"})
+
+@api_view(['GET'])
+def check_sunat_status(request, comprobante_id):
+    return Response({"ok": True, "msg": "check_sunat_status placeholder"})
+
+@api_view(['GET'])
+def get_comprobante_status(request, comprobante_id):
+    return Response({"ok": True, "msg": "get_comprobante_status placeholder"})
+
+@api_view(['GET'])
+def retry_sunat_send(request, comprobante_id):
+    return Response({"ok": True, "msg": "retry_sunat_send placeholder"})
+
+@api_view(['POST'])
+def bulk_send_to_sunat(request):
+    return Response({"ok": True, "msg": "bulk_send_to_sunat placeholder"})
+
+@api_view(['GET'])
+def check_pending_tickets(request):
+    return Response({"ok": True, "msg": "check_pending_tickets placeholder"})
+
+@api_view(['GET'])
+def get_cdr_file(request, comprobante_id):
+    return Response({"ok": True, "msg": "get_cdr_file placeholder"})
+
+@api_view(['GET'])
+def sunat_dashboard(request):
+    return Response({"ok": True, "msg": "sunat_dashboard placeholder"})

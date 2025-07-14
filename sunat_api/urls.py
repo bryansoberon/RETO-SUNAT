@@ -5,10 +5,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from comprobantes.views import frontend_view
 
 urlpatterns = [
-    path('', frontend_view, name='frontend'),  # ← NUEVA RUTA PARA FRONTEND
+    path('', include('comprobantes.urls_frontend')),  # ← CAMBIO: Separar frontend
     path('admin/', admin.site.urls),
     path('api/v1/', include('comprobantes.urls')),
     path('health/', include('comprobantes.urls_health')),

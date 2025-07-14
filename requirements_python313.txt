@@ -1,5 +1,5 @@
 # ===========================================
-# API REST SUNAT - Requirements para Python 3.13
+# API REST SUNAT - Requirements Corregido
 # ===========================================
 
 # Django y REST Framework
@@ -7,31 +7,60 @@ Django==4.2.7
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
 
-# HTTP requests
+# Base de datos
+mysqlclient>=2.2.0
+
+# HTTP requests y SOAP
 requests==2.31.0
+zeep==4.2.1
+suds-py3==1.4.5.0
 
 # Variables de entorno
 python-decouple==3.8
 
-# Validación de esquemas XML
+# Procesamiento XML - VERSIONES COMPATIBLES
+lxml>=4.9.0,<6.0.0  # Forzar versión compatible con signxml
 xmlschema==2.5.1
-
-# Utilidades adicionales
-python-dateutil==2.8.2
-
-# Cliente SOAP (opcional)
-zeep==4.2.1
-
-# Procesamiento XML seguro (alternativa a lxml)
 defusedxml>=0.7.1
 
-# Base de datos MySQL
-mysqlclient>=2.2.0
+# Firma digital - VERSIÓN COMPATIBLE
+signxml>=3.0.0,<4.2.0  # Versión compatible con lxml
+cryptography>=40.0.0
+
+# Utilidades de fecha
+python-dateutil==2.8.2
+
+# Logging avanzado
+colorlog>=6.7.0
 
 # ===========================================
-# NOTA: lxml se instala automáticamente si hay wheels disponibles
-# Si no se puede instalar, el proyecto usará xml.etree.ElementTree
+# Desarrollo y testing
 # ===========================================
 
-# Procesamiento XML (opcional en Python 3.13)
-# lxml>=5.0.0  # Descomenta si quieres intentar instalarlo 
+# Testing
+pytest>=7.0.0
+pytest-django>=4.5.0
+
+# Cobertura de código
+coverage>=7.0.0
+
+# Linting y formato
+flake8>=6.0.0
+black>=23.0.0
+
+# Validación JSON
+jsonschema>=4.0.0
+jsonschema-specifications>=2023.0.0
+
+# Documentación API
+drf-spectacular>=0.26.0
+
+# ===========================================
+# Notas importantes:
+# 
+# 1. Se fijó lxml<6.0.0 para compatibilidad con signxml
+# 2. Se especificó signxml<4.2.0 para evitar conflictos
+# 3. Para resolver conflictos existentes:
+#    pip uninstall lxml signxml
+#    pip install -r requirements.txt
+# ===========================================
