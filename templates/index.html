@@ -193,6 +193,14 @@
                                     </div>
                                 </div>
 
+                                <!-- Debug Info -->
+                                <div class="alert alert-info">
+                                    <small>
+                                        <strong>Debug:</strong>
+                                        <span id="debugInfo">Los totales se actualizarán automáticamente</span>
+                                    </small>
+                                </div>
+
                                 <!-- Botones -->
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                     <button type="button" id="validateBtn" class="btn btn-outline-primary">
@@ -222,6 +230,21 @@
                             <div id="results">
                                 <p class="text-muted">Los resultados aparecerán aquí...</p>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- JSON Preview -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-code"></i>
+                                JSON Preview
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <pre id="jsonPreview" style="font-size: 11px; max-height: 400px; overflow-y: auto;">
+El JSON aparecerá aquí...
+                            </pre>
                         </div>
                     </div>
 
@@ -365,6 +388,23 @@
             document.getElementById('totalGravado').value = totalGravado.toFixed(2);
             document.getElementById('totalIGV').value = igv.toFixed(2);
             document.getElementById('totalImportePagar').value = totalPagar.toFixed(2);
+            
+            // Debug info
+            const debugInfo = `Gravado: ${totalGravado.toFixed(2)}, IGV: ${igv.toFixed(2)}, Total: ${totalPagar.toFixed(2)}`;
+            document.getElementById('debugInfo').textContent = debugInfo;
+            
+            // Actualizar JSON preview
+            updateJsonPreview();
+        }
+
+        // Actualizar JSON preview
+        function updateJsonPreview() {
+            try {
+                const json = generateJSON();
+                document.getElementById('jsonPreview').textContent = JSON.stringify(json, null, 2);
+            } catch (error) {
+                document.getElementById('jsonPreview').textContent = `Error generando JSON: ${error.message}`;
+            }
         }
 
         // Cambiar serie según tipo de documento
@@ -379,6 +419,7 @@
             document.getElementById('tipoDocCliente').value = tipoDoc;
             document.getElementById('numeroDocCliente').value = numeroDoc;
             document.getElementById('razonSocialCliente').value = razonSocial;
+            updateJsonPreview();
         });
 
         // Generar JSON del formulario
@@ -388,7 +429,6 @@
                 const cantidad = parseFloat(row.querySelector('.item-cantidad').value);
                 const valorUnitario = parseFloat(row.querySelector('.item-precio').value);
                 const valorTotal = parseFloat(row.querySelector('.item-total').value);
-                const igv = valorTotal * 0.18;
                 
                 items.push({
                     id: (index + 1).toString(),
@@ -396,9 +436,9 @@
                     unidadMedida: "NIU",
                     descripcion: row.querySelector('.item-descripcion').value,
                     valorUnitario: valorUnitario,
-                    precioVentaUnitario: valorUnitario * 1.18,
+                    precioVentaUnitario: (valorUnitario * 1.18),
                     valorTotal: valorTotal,
-                    igv: igv,
+                    igv: (valorTotal * 0.18),
                     codigoProducto: `PROD${String(index + 1).padStart(3, '0')}`,
                     codigoProductoSUNAT: `PROD${String(index + 1).padStart(3, '0')}`,
                     codigoTipoPrecio: "01",
@@ -411,6 +451,9 @@
                 });
             });
 
+            const totalGravado = parseFloat(document.getElementById('totalGravado').value);
+            const totalIGV = parseFloat(document.getElementById('totalIGV').value);
+
             return {
                 serie: document.getElementById('serie').value,
                 numero: document.getElementById('numero').value.padStart(8, '0'),
@@ -419,10 +462,10 @@
                 tipoDocumento: document.getElementById('tipoDocumento').value,
                 moneda: document.getElementById('moneda').value,
                 formaPago: "Contado",
-                totalGravado: parseFloat(document.getElementById('totalGravado').value),
-                totalIGV: parseFloat(document.getElementById('totalIGV').value),
-                totalPrecioVenta: parseFloat(document.getElementById('totalGravado').value),
-                totalImportePagar: parseFloat(document.getElementById('totalImportePagar').value),
+                totalGravado: totalGravado,
+                totalIGV: totalIGV,
+                totalPrecioVenta: totalGravado,
+                totalImportePagar: totalGravado + totalIGV,
                 emisor: {
                     ruc: document.getElementById('rucEmisor').value,
                     razonSocial: document.getElementById('razonSocialEmisor').value,
@@ -581,6 +624,10 @@
         // Inicializar
         updateTotals();
         document.getElementById('checkHealth').click();
+        
+        // Actualizar JSON preview cuando cambie cualquier campo
+        document.addEventListener('input', updateJsonPreview);
+        document.addEventListener('change', updateJsonPreview);
     </script>
 </body>
 </html>
