@@ -46,7 +46,7 @@ ROOT_URLCONF = 'sunat_api.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # ← CONFIGURACIÓN PARA FRONTEND
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -128,6 +128,12 @@ REST_FRAMEWORK = {
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "file://",
+    "null",
+]
 
 # SUNAT API Configuration
 SUNAT_CONFIG = {
@@ -140,4 +146,7 @@ SUNAT_CONFIG = {
 
 # Create directories if they don't exist
 os.makedirs(SUNAT_CONFIG['XML_OUTPUT_DIR'], exist_ok=True)
-os.makedirs(SUNAT_CONFIG['ZIP_OUTPUT_DIR'], exist_ok=True) 
+os.makedirs(SUNAT_CONFIG['ZIP_OUTPUT_DIR'], exist_ok=True)
+
+# Create templates directory if it doesn't exist
+os.makedirs(os.path.join(BASE_DIR, 'templates'), exist_ok=True)

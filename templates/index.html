@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API SUNAT - Comprobantes Electrónicos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="bg-primary text-white py-3 mb-4">
+            <div class="container">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-file-earmark-text"></i>
+                    API SUNAT - Comprobantes Electrónicos
+                </h1>
+                <p class="mb-0">Generador de XML UBL 2.1 compatible con SUNAT</p>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- Status del servidor -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-activity"></i>
+                                Estado del Servidor
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <button id="checkHealth" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Verificar Estado
+                            </button>
+                            <div id="healthStatus" class="mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario principal -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-file-plus"></i>
+                                Generar Comprobante Electrónico
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="comprobanteForm">
+                                <!-- Datos básicos -->
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Tipo</label>
+                                        <select class="form-select" id="tipoDocumento" required>
+                                            <option value="01">01 - Factura</option>
+                                            <option value="03">03 - Boleta</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Serie</label>
+                                        <input type="text" class="form-control" id="serie" value="F001" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Número</label>
+                                        <input type="text" class="form-control" id="numero" value="00000001" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Fecha</label>
+                                        <input type="date" class="form-control" id="fechaEmision" required>
+                                    </div>
+                                </div>
+
+                                <!-- Emisor -->
+                                <h6 class="text-primary">Datos del Emisor</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">RUC</label>
+                                        <input type="text" class="form-control" id="rucEmisor" value="20607599727" required>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Razón Social</label>
+                                        <input type="text" class="form-control" id="razonSocialEmisor" value="INSTITUTO INTERNACIONAL DE SOFTWARE S.A.C." required>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Dirección</label>
+                                        <input type="text" class="form-control" id="direccionEmisor" value="8 DE OCTUBRE N 123 - LAMBAYEQUE - LAMBAYEQUE - LAMBAYEQUE">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Ubigeo</label>
+                                        <input type="text" class="form-control" id="ubigeoEmisor" value="140101">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">País</label>
+                                        <input type="text" class="form-control" id="paisEmisor" value="PE">
+                                    </div>
+                                </div>
+
+                                <!-- Cliente -->
+                                <h6 class="text-primary">Datos del Cliente</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-2">
+                                        <label class="form-label">Tipo Doc</label>
+                                        <select class="form-select" id="tipoDocCliente">
+                                            <option value="1">DNI</option>
+                                            <option value="6" selected>RUC</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Número</label>
+                                        <input type="text" class="form-control" id="numeroDocCliente" value="20605145648" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Razón Social</label>
+                                        <input type="text" class="form-control" id="razonSocialCliente" value="CLIENTE DE MUESTRA SAC" required>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Dirección</label>
+                                        <input type="text" class="form-control" id="direccionCliente" value="AV. PRINCIPAL 123 - TRUJILLO">
+                                    </div>
+                                </div>
+
+                                <!-- Items -->
+                                <h6 class="text-primary">Items del Comprobante</h6>
+                                <div id="itemsContainer">
+                                    <div class="item-row border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-1">
+                                                <label class="form-label">Item</label>
+                                                <input type="text" class="form-control item-id" value="1" readonly>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Descripción</label>
+                                                <input type="text" class="form-control item-descripcion" value="FENA X L" required>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Cantidad</label>
+                                                <input type="number" class="form-control item-cantidad" value="1" step="0.01" required>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Precio Unit.</label>
+                                                <input type="number" class="form-control item-precio" value="156.78" step="0.01" required>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Total</label>
+                                                <input type="number" class="form-control item-total" value="156.78" step="0.01" readonly>
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="form-label">&nbsp;</label>
+                                                <button type="button" class="btn btn-danger w-100 remove-item">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" id="addItem" class="btn btn-outline-secondary mb-3">
+                                    <i class="bi bi-plus"></i>
+                                    Agregar Item
+                                </button>
+
+                                <!-- Totales -->
+                                <h6 class="text-primary">Totales</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Total Gravado</label>
+                                        <input type="number" class="form-control" id="totalGravado" value="156.78" step="0.01" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">IGV (18%)</label>
+                                        <input type="number" class="form-control" id="totalIGV" value="28.22" step="0.01" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Total a Pagar</label>
+                                        <input type="number" class="form-control" id="totalImportePagar" value="185.00" step="0.01" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Moneda</label>
+                                        <select class="form-select" id="moneda">
+                                            <option value="PEN" selected>PEN - Soles</option>
+                                            <option value="USD">USD - Dólares</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Botones -->
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" id="validateBtn" class="btn btn-outline-primary">
+                                        <i class="bi bi-check-circle"></i>
+                                        Validar
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-file-earmark-arrow-down"></i>
+                                        Generar XML
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel de resultados -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-check"></i>
+                                Resultados
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="results">
+                                <p class="text-muted">Los resultados aparecerán aquí...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historial -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-clock-history"></i>
+                                Historial
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="history">
+                                <p class="text-muted">No hay archivos generados aún...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let itemCounter = 1;
+        let generatedFiles = [];
+
+        // Establecer fecha actual
+        document.getElementById('fechaEmision').value = new Date().toISOString().split('T')[0];
+
+        // Check health del servidor
+        document.getElementById('checkHealth').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('healthStatus');
+            statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Verificando...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/health/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            ${data.message} - Versión: ${data.version}
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.message || 'Error desconocido');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Agregar item
+        document.getElementById('addItem').addEventListener('click', () => {
+            itemCounter++;
+            const container = document.getElementById('itemsContainer');
+            const newItem = document.createElement('div');
+            newItem.className = 'item-row border rounded p-3 mb-3';
+            newItem.innerHTML = `
+                <div class="row">
+                    <div class="col-md-1">
+                        <label class="form-label">Item</label>
+                        <input type="text" class="form-control item-id" value="${itemCounter}" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Descripción</label>
+                        <input type="text" class="form-control item-descripcion" value="PRODUCTO ${itemCounter}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" class="form-control item-cantidad" value="1" step="0.01" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Precio Unit.</label>
+                        <input type="number" class="form-control item-precio" value="100.00" step="0.01" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Total</label>
+                        <input type="number" class="form-control item-total" value="100.00" step="0.01" readonly>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-danger w-100 remove-item">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(newItem);
+            updateTotals();
+        });
+
+        // Remover item
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-item')) {
+                const itemRows = document.querySelectorAll('.item-row');
+                if (itemRows.length > 1) {
+                    e.target.closest('.item-row').remove();
+                    updateTotals();
+                } else {
+                    alert('Debe mantener al menos un item');
+                }
+            }
+        });
+
+        // Actualizar totales cuando cambian los items
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('item-cantidad') || e.target.classList.contains('item-precio')) {
+                const row = e.target.closest('.item-row');
+                const cantidad = parseFloat(row.querySelector('.item-cantidad').value) || 0;
+                const precio = parseFloat(row.querySelector('.item-precio').value) || 0;
+                const total = cantidad * precio;
+                row.querySelector('.item-total').value = total.toFixed(2);
+                updateTotals();
+            }
+        });
+
+        // Actualizar totales generales
+        function updateTotals() {
+            const items = document.querySelectorAll('.item-row');
+            let totalGravado = 0;
+            
+            items.forEach(item => {
+                const total = parseFloat(item.querySelector('.item-total').value) || 0;
+                totalGravado += total;
+            });
+            
+            const igv = totalGravado * 0.18;
+            const totalPagar = totalGravado + igv;
+            
+            document.getElementById('totalGravado').value = totalGravado.toFixed(2);
+            document.getElementById('totalIGV').value = igv.toFixed(2);
+            document.getElementById('totalImportePagar').value = totalPagar.toFixed(2);
+        }
+
+        // Cambiar serie según tipo de documento
+        document.getElementById('tipoDocumento').addEventListener('change', (e) => {
+            const serie = e.target.value === '01' ? 'F001' : 'B001';
+            document.getElementById('serie').value = serie;
+            
+            const tipoDoc = e.target.value === '01' ? '6' : '1';
+            const numeroDoc = e.target.value === '01' ? '20605145648' : '12345678';
+            const razonSocial = e.target.value === '01' ? 'CLIENTE DE MUESTRA SAC' : 'JUAN PEREZ LOPEZ';
+            
+            document.getElementById('tipoDocCliente').value = tipoDoc;
+            document.getElementById('numeroDocCliente').value = numeroDoc;
+            document.getElementById('razonSocialCliente').value = razonSocial;
+        });
+
+        // Generar JSON del formulario
+        function generateJSON() {
+            const items = [];
+            document.querySelectorAll('.item-row').forEach((row, index) => {
+                const cantidad = parseFloat(row.querySelector('.item-cantidad').value);
+                const valorUnitario = parseFloat(row.querySelector('.item-precio').value);
+                const valorTotal = parseFloat(row.querySelector('.item-total').value);
+                const igv = valorTotal * 0.18;
+                
+                items.push({
+                    id: (index + 1).toString(),
+                    cantidad: cantidad,
+                    unidadMedida: "NIU",
+                    descripcion: row.querySelector('.item-descripcion').value,
+                    valorUnitario: valorUnitario,
+                    precioVentaUnitario: valorUnitario * 1.18,
+                    valorTotal: valorTotal,
+                    igv: igv,
+                    codigoProducto: `PROD${String(index + 1).padStart(3, '0')}`,
+                    codigoProductoSUNAT: `PROD${String(index + 1).padStart(3, '0')}`,
+                    codigoTipoPrecio: "01",
+                    tipoAfectacionIGV: "10",
+                    porcentajeIGV: 18,
+                    codigoTributo: "1000",
+                    nombreTributo: "IGV",
+                    tipoTributo: "VAT",
+                    unspsc: "10191509"
+                });
+            });
+
+            return {
+                serie: document.getElementById('serie').value,
+                numero: document.getElementById('numero').value.padStart(8, '0'),
+                fechaEmision: document.getElementById('fechaEmision').value,
+                horaEmision: new Date().toTimeString().split(' ')[0],
+                tipoDocumento: document.getElementById('tipoDocumento').value,
+                moneda: document.getElementById('moneda').value,
+                formaPago: "Contado",
+                totalGravado: parseFloat(document.getElementById('totalGravado').value),
+                totalIGV: parseFloat(document.getElementById('totalIGV').value),
+                totalPrecioVenta: parseFloat(document.getElementById('totalGravado').value),
+                totalImportePagar: parseFloat(document.getElementById('totalImportePagar').value),
+                emisor: {
+                    ruc: document.getElementById('rucEmisor').value,
+                    razonSocial: document.getElementById('razonSocialEmisor').value,
+                    nombreComercial: document.getElementById('razonSocialEmisor').value,
+                    ubigeo: document.getElementById('ubigeoEmisor').value,
+                    direccion: document.getElementById('direccionEmisor').value,
+                    departamento: "LAMBAYEQUE",
+                    provincia: "LAMBAYEQUE",
+                    distrito: "LAMBAYEQUE",
+                    codigoPais: document.getElementById('paisEmisor').value,
+                    correo: "test@institutoisi.com"
+                },
+                cliente: {
+                    numeroDoc: document.getElementById('numeroDocCliente').value,
+                    razonSocial: document.getElementById('razonSocialCliente').value,
+                    tipoDoc: document.getElementById('tipoDocCliente').value,
+                    ubigeo: "130101",
+                    direccion: document.getElementById('direccionCliente').value,
+                    departamento: "LA LIBERTAD",
+                    provincia: "TRUJILLO",
+                    distrito: "TRUJILLO",
+                    codigoPais: "PE",
+                    correo: "cliente@correo.com"
+                },
+                items: items
+            };
+        }
+
+        // Validar comprobante
+        document.getElementById('validateBtn').addEventListener('click', async () => {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Validando...';
+            
+            try {
+                const data = generateJSON();
+                const response = await fetch(`${API_BASE}/api/v1/validate/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Validación exitosa</strong><br>
+                            ${result.message}<br>
+                            <small>ID: ${result.comprobante_id}</small>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Errores de validación:</strong><br>
+                            ${Array.isArray(result.errors) ? result.errors.join('<br>') : JSON.stringify(result.errors)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Generar XML
+        document.getElementById('comprobanteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Generando XML...';
+            
+            try {
+                const data = generateJSON();
+                const response = await fetch(`${API_BASE}/api/v1/convert/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    generatedFiles.push(result);
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>¡XML generado exitosamente!</strong><br>
+                            ${result.message}<br>
+                            <hr>
+                            <strong>Archivos:</strong><br>
+                            <small>XML: ${result.xml_filename}</small><br>
+                            <small>ZIP: ${result.zip_filename}</small><br>
+                            <hr>
+                            <a href="${API_BASE}/api/v1/xml/${result.xml_filename}/" 
+                               class="btn btn-sm btn-outline-primary" target="_blank">
+                                <i class="bi bi-download"></i> Descargar XML
+                            </a>
+                        </div>
+                    `;
+                    updateHistory();
+                    
+                    // Incrementar número automáticamente
+                    const numeroActual = parseInt(document.getElementById('numero').value);
+                    document.getElementById('numero').value = String(numeroActual + 1).padStart(8, '0');
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-x-circle"></i>
+                            <strong>Error al generar XML:</strong><br>
+                            ${Array.isArray(result.errors) ? result.errors.join('<br>') : result.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Actualizar historial
+        function updateHistory() {
+            const historyDiv = document.getElementById('history');
+            if (generatedFiles.length === 0) {
+                historyDiv.innerHTML = '<p class="text-muted">No hay archivos generados aún...</p>';
+                return;
+            }
+            
+            const historyHTML = generatedFiles.slice(-5).reverse().map(file => `
+                <div class="border-bottom pb-2 mb-2">
+                    <strong>${file.xml_filename}</strong><br>
+                    <small class="text-muted">ID: ${file.comprobante_id}</small><br>
+                    <a href="${API_BASE}/api/v1/xml/${file.xml_filename}/" 
+                       class="btn btn-sm btn-outline-secondary" target="_blank">
+                        <i class="bi bi-download"></i> Descargar
+                    </a>
+                </div>
+            `).join('');
+            
+            historyDiv.innerHTML = historyHTML;
+        }
+
+        // Inicializar
+        updateTotals();
+        document.getElementById('checkHealth').click();
+    </script>
+</body>
+</html>

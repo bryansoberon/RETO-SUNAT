@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.shortcuts import render
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ from .serializers import (
 from .models import Comprobante, DetalleComprobante
 from .utils import (
     validate_comprobante_data,
-    generate_ubl_xml,
+    generate_ubl_xml,  # Ahora usa la versión optimizada para NubeFacT
     create_zip_file,
     validate_xml_structure,
     extraer_clave_certificado_pfx,
@@ -27,6 +28,14 @@ from .utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def frontend_view(request):
+    """
+    Vista para servir el frontend HTML
+    Accesible en: http://localhost:8000/
+    """
+    return render(request, 'index.html')
 
 
 @api_view(['POST'])
@@ -146,12 +155,16 @@ def convert_to_xml(request):
             }
         )
         
-        # Generar XML UBL 2.1
+        # Generar XML UBL 2.1 optimizado para NubeFacT
+        print("🔧 Generando XML optimizado para NubeFacT...")
         xml_content = generate_ubl_xml(serializer.validated_data)
+        print(f"✅ XML generado correctamente ({len(xml_content)} caracteres)")
 
         # Firmar el XML
+        print("🔐 Iniciando proceso de firma digital...")
         private_key, cert = get_cert_and_key()
         xml_firmado = firmar_xml_ubl(xml_content, private_key, cert)
+        print("✅ XML firmado correctamente")
         
         # Validar estructura XML
         xml_validation = validate_xml_structure(xml_firmado)
@@ -170,11 +183,15 @@ def convert_to_xml(request):
         xml_path = os.path.join(settings.SUNAT_CONFIG['XML_OUTPUT_DIR'], xml_filename)
         with open(xml_path, 'w', encoding='utf-8') as f:
             f.write(xml_firmado)
+        print(f"📁 XML guardado: {xml_filename}")
         
         # Crear archivo ZIP
         zip_filename = comprobante.get_zip_filename()
         zip_path = os.path.join(settings.SUNAT_CONFIG['ZIP_OUTPUT_DIR'], zip_filename)
-        create_zip_file(xml_path, zip_path)
+        if create_zip_file(xml_path, zip_path):
+            print(f"📦 ZIP creado: {zip_filename}")
+        else:
+            print("⚠️ Error al crear ZIP")
         
         # Actualizar modelo
         comprobante.xml_file = f'xml/{xml_filename}'
@@ -259,4 +276,4 @@ def health_check(request):
             'message': 'Error en el sistema',
             'status': 'unhealthy',
             'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
