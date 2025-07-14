@@ -14,6 +14,12 @@ except ImportError:
     LXML_AVAILABLE = False
     print("⚠️  lxml no disponible, usando xml.etree.ElementTree (más lento)")
 
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.hazmat.backends import default_backend
+import base64
+from signxml import XMLSigner, methods
+from cryptography.hazmat.primitives import serialization
+
 
 def validate_comprobante_data(data):
     """
@@ -77,20 +83,18 @@ def generate_ubl_xml(data):
         'ds': 'http://www.w3.org/2000/09/xmldsig#',
         'ext': 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2',
         'qdt': 'urn:oasis:names:specification:ubl:schema:xsd:QualifiedDatatypes-2',
-        'udt': 'urn:un:unece:uncefact:data:specification:UnqualifiedDataTypesSchemaModule:2',
-        'dummy': 'http://example.org/dummy'  # Namespace para elementos de prueba
+        'udt': 'urn:un:unece:uncefact:data:specification:UnqualifiedDataTypesSchemaModule:2'
     })
     root.set('{http://www.w3.org/2001/XMLSchema-instance}schemaLocation', 
              'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2')
     
-    # Agregar UBLExtensions
-    add_ublextensions(root, data)
+    # Agregar UBLExtensions con UBLExtension y ExtensionContent vacío
+    ubl_extensions = etree.SubElement(root, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}UBLExtensions')
+    ubl_extension = etree.SubElement(ubl_extensions, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}UBLExtension')
+    etree.SubElement(ubl_extension, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}ExtensionContent')
     
     # Agregar elementos básicos
     add_basic_elements_new(root, data)
-    
-    # Agregar firma
-    add_signature(root, data)
     
     # Agregar emisor
     add_supplier_party_new(root, data)
@@ -415,18 +419,6 @@ def add_cdata_element(parent, tag, text):
     else:
         element.text = "<![CDATA[]]>"
     return element
-
-def add_ublextensions(root, data):
-    """Agregar UBLExtensions con Note de prueba"""
-    ubl_extensions = etree.SubElement(root, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}UBLExtensions')
-    ubl_extension = etree.SubElement(ubl_extensions, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}UBLExtension')
-    extension_content = etree.SubElement(ubl_extension, '{urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2}ExtensionContent')
-    
-    # Agregar Note de prueba con namespace dummy
-    # Usar etree.QName para crear el elemento con el prefijo correcto
-    dummy_ns = 'http://example.org/dummy'
-    note = etree.SubElement(extension_content, etree.QName(dummy_ns, 'Note'))
-    note.text = "Prueba sin firma"
 
 def add_basic_elements_new(root, data):
     """Agregar elementos básicos del comprobante según formato específico"""
@@ -833,3 +825,67 @@ def add_invoice_lines_new(root, data):
         price_amount = etree.SubElement(price, '{urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2}PriceAmount')
         price_amount.set('currencyID', data.get('moneda', 'PEN'))
         price_amount.text = str(item['valorUnitario']) 
+
+
+def extraer_clave_certificado_pfx(pfx_path, password):
+    """Extrae la clave privada y el certificado del archivo PFX y los retorna en formato PEM"""
+    with open(pfx_path, 'rb') as f:
+        pfx_data = f.read()
+    private_key, cert, additional_certs = pkcs12.load_key_and_certificates(
+        pfx_data, password.encode(), backend=default_backend()
+    )
+    # Convertir a PEM
+    cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    return private_key_pem, cert_pem
+
+def firmar_xml_ubl(xml_string, private_key, cert):
+    """Firma el XML UBL 2.1 e inserta la firma en <ext:ExtensionContent> (SUNAT), compatible con signxml antiguo."""
+    from lxml import etree
+    print("🔍 Debug: Iniciando proceso de firma...")
+    
+    # Parsear el XML
+    root = etree.fromstring(xml_string.encode('utf-8'))
+    print("🔍 Debug: XML parseado correctamente")
+
+    # Firmar el XML (la firma aparecerá como hija del nodo raíz)
+    print("🔍 Debug: Iniciando firma con signxml...")
+    signer = XMLSigner(
+        method=methods.enveloped,
+        signature_algorithm="rsa-sha256",
+        digest_algorithm="sha256",
+        c14n_algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"
+    )
+    signed_root = signer.sign(root, key=private_key, cert=cert, reference_uri=None)
+    print("🔍 Debug: Firma completada con signxml")
+
+    # Buscar el nodo <ds:Signature> generado (hijo directo del nodo raíz)
+    signature_node = signed_root.find('.//{http://www.w3.org/2000/09/xmldsig#}Signature')
+    if signature_node is None:
+        print("❌ ERROR: No se generó el nodo <ds:Signature> al firmar el XML")
+        # Retornar el XML original para debug
+        return xml_string
+    print("🔍 Debug: Nodo <ds:Signature> encontrado")
+
+    # Buscar el nodo <ext:ExtensionContent> en el árbol firmado
+    ns = signed_root.nsmap.copy()
+    ns['ext'] = ns.get('ext', 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2')
+    extension_content = signed_root.find('.//ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent', namespaces=ns)
+    if extension_content is None:
+        print("❌ ERROR: No se encontró el nodo <ext:ExtensionContent> en el XML firmado")
+        return xml_string
+    print("🔍 Debug: Nodo <ext:ExtensionContent> encontrado en árbol firmado")
+
+    # Mover la firma al <ext:ExtensionContent> (eliminar de su padre original y añadir al destino)
+    signature_node.getparent().remove(signature_node)
+    extension_content.append(signature_node)
+    print("🔍 Debug: Firma movida a <ext:ExtensionContent>")
+
+    # Retornar el XML firmado como string
+    result = etree.tostring(signed_root, encoding='utf-8', xml_declaration=False, pretty_print=True).decode('utf-8')
+    print("🔍 Debug: XML firmado serializado correctamente")
+    return result 

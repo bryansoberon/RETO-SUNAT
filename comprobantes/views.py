@@ -21,7 +21,9 @@ from .utils import (
     validate_comprobante_data,
     generate_ubl_xml,
     create_zip_file,
-    validate_xml_structure
+    validate_xml_structure,
+    extraer_clave_certificado_pfx,
+    firmar_xml_ubl
 )
 
 logger = logging.getLogger(__name__)
@@ -97,11 +99,24 @@ def validate_comprobante(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+CERT_PATH = os.path.join(settings.BASE_DIR, 'CERTIFICADO.pfx')
+CERT_PASS = 'prueba123'
+
+# Cargar clave y certificado una sola vez (cache)
+PRIVATE_KEY = None
+CERT = None
+
+def get_cert_and_key():
+    global PRIVATE_KEY, CERT
+    if PRIVATE_KEY is None or CERT is None:
+        PRIVATE_KEY, CERT = extraer_clave_certificado_pfx(CERT_PATH, CERT_PASS)
+    return PRIVATE_KEY, CERT
+
 @api_view(['POST'])
 @parser_classes([JSONParser])
 def convert_to_xml(request):
     """
-    Endpoint para convertir JSON a XML UBL 2.1 y generar ZIP
+    Endpoint para convertir JSON a XML UBL 2.1, firmar y generar ZIP
     POST /api/v1/convert/
     """
     try:
@@ -133,31 +148,32 @@ def convert_to_xml(request):
         
         # Generar XML UBL 2.1
         xml_content = generate_ubl_xml(serializer.validated_data)
+
+        # Firmar el XML
+        private_key, cert = get_cert_and_key()
+        xml_firmado = firmar_xml_ubl(xml_content, private_key, cert)
         
         # Validar estructura XML
-        xml_validation = validate_xml_structure(xml_content)
+        xml_validation = validate_xml_structure(xml_firmado)
         if not xml_validation['success']:
             comprobante.estado = 'ERROR'
             comprobante.errores = json.dumps(xml_validation['errors'])
             comprobante.save()
-            
             return Response({
                 'success': False,
                 'message': 'Error en estructura XML',
                 'errors': xml_validation['errors']
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Guardar archivo XML
+        # Guardar archivo XML firmado
         xml_filename = comprobante.get_xml_filename()
         xml_path = os.path.join(settings.SUNAT_CONFIG['XML_OUTPUT_DIR'], xml_filename)
-        
         with open(xml_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content)
+            f.write(xml_firmado)
         
         # Crear archivo ZIP
         zip_filename = comprobante.get_zip_filename()
         zip_path = os.path.join(settings.SUNAT_CONFIG['ZIP_OUTPUT_DIR'], zip_filename)
-        
         create_zip_file(xml_path, zip_path)
         
         # Actualizar modelo
@@ -168,7 +184,7 @@ def convert_to_xml(request):
         
         return Response({
             'success': True,
-            'message': 'Comprobante convertido y empaquetado correctamente',
+            'message': 'Comprobante convertido, firmado y empaquetado correctamente',
             'xml_filename': xml_filename,
             'zip_filename': zip_filename,
             'comprobante_id': comprobante.id
